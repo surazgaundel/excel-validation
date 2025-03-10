@@ -1,0 +1,294 @@
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.app-header h1 {
+  font-size: 2rem;
+  margin-bottom: 10px;
+}
+
+.description {
+  color: #666;
+  font-size: 1rem;
+}
+
+.app-footer {
+  margin-top: 40px;
+  text-align: center;
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.button {
+  background-color: #3b82f6;
+  color: white;
+  font-weight: 500;
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.button:hover {
+  background-color: #2563eb;
+}
+
+.button:disabled {
+  background-color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.button-outline {
+  background-color: transparent;
+  color: #3b82f6;
+  border: 1px solid #3b82f6;
+}
+
+.button-outline:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.grid {
+  display: grid;
+  gap: 24px;
+}
+
+.grid-cols-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 768px) {
+  .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-top: 16px;
+  display: flex;
+  align-items: flex-start;
+}
+
+.alert-success {
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.alert-error {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.alert-icon {
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.alert-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.tabs {
+  margin-top: 24px;
+}
+
+.tabs-list {
+  display: flex;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 12px;
+}
+
+.tab {
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-active {
+  border-bottom-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.tab-content {
+  padding: 16px;
+  background-color: #f8fafc;
+  border-radius: 6px;
+}
+
+.progress-container {
+  width: 100%;
+  background-color: #e2e8f0;
+  border-radius: 9999px;
+  height: 8px;
+  overflow: hidden;
+  margin: 16px 0;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #3b82f6;
+  transition: width 0.3s ease;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stats-card {
+  padding: 16px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.stats-card-total {
+  background-color: #f1f5f9;
+}
+
+.stats-card-valid {
+  background-color: #f0fdf4;
+}
+
+.stats-card-invalid {
+  background-color: #fff7ed;
+}
+
+.stats-card p:first-child {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.stats-card p:last-child {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.mt-4 {
+  margin-top: 16px;
+}
+
+.flex {
+  display: flex;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.align-center {
+  align-items: center;
+}
+
+.w-full {
+  width: 100%;
+}
+
+/* Add these styles at the end of the file */
+
+.validation-engine {
+  margin-top: 20px;
+}
+
+.validation-progress {
+  margin: 20px 0;
+}
+
+.progress-text {
+  text-align: center;
+  font-size: 0.875rem;
+  color: #666;
+  margin-top: 8px;
+}
+
+.validation-error {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-top: 16px;
+  color: #ef4444;
+}
+
+.validation-results {
+  margin-top: 24px;
+}
+
+.results-title {
+  font-size: 1.125rem;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.error-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.error-type {
+  background-color: #f8fafc;
+  padding: 12px;
+  border-radius: 6px;
+}
+
+.error-type h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.error-details {
+  margin-top: 16px;
+}
+
+.error-details h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.error-list {
+  list-style: none;
+  padding: 0;
+}
+
+.error-item {
+  background-color: #f8fafc;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  font-size: 0.75rem;
+}
+
+.error-more {
+  text-align: center;
+  font-style: italic;
+  color: #64748b;
+  font-size: 0.75rem;
+  margin-top: 8px;
+}
+
