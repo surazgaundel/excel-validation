@@ -78,25 +78,31 @@ function ExcelProcessor() {
           const inputSheet = inputFile.data.Sheets[inputFile.data.SheetNames[0]]
   
           // Get the map and rules sheets from rules file
-          const mapSheet = rulesFile.data.Sheets[rulesFile.data.SheetNames[0]] // First sheet is Map
-          const rulesSheet = rulesFile.data.Sheets[rulesFile.data.SheetNames[1]] // Second sheet is Rules
+          const mapSheet = rulesFile.data.Sheets[rulesFile.data.SheetNames[0]];
+          const rulesSheet = rulesFile.data.Sheets[rulesFile.data.SheetNames[1]];
   
           // Convert sheets to JSON
           const inputData = XLSX.utils.sheet_to_json(inputSheet, { header: 1 })
           const mapData = XLSX.utils.sheet_to_json(mapSheet, { header: 1 })
           const rulesData = XLSX.utils.sheet_to_json(rulesSheet, { header: 1 })
-  
+          
           // Extract headers
-          const headers = inputData[0]
-  
+          const headers = inputData[0].map(header => header?.toString().trim());
+
+          const formattedInputData = inputData.slice(1).map(row => {
+            let obj = {};
+            headers.forEach((header, index) => {
+                obj[header] = row[index] || null;
+            });
+            return obj;
+        });
           // Parse data type map
-          const dataTypeMap = parseDataTypeMap(mapData, headers)
-  
+          const dataTypeMap = parseDataTypeMap(mapData);
           // Parse rules
           const conditions = parseRules(rulesData)
   
           // Validate data types and rules
-          const validationResult = validateRows(inputData, dataTypeMap, conditions)
+          const validationResult = validateRows(formattedInputData, dataTypeMap, conditions)
   
           // Update validation results
           setValidationResults({
@@ -116,7 +122,6 @@ function ExcelProcessor() {
             headers,
           )
           setProcessedFile(processedWorkbook);
-          console.log(processedWorkbook);
           setValidationStatus("success")
           setValidationProgress(100)
   
@@ -129,7 +134,7 @@ function ExcelProcessor() {
     }
   
     // Parse the data type map from the Map sheet
-    const parseDataTypeMap = (mapData, headers) => {
+    const parseDataTypeMap = (mapData) => {
       const dataTypeMap = {}
   
       // Skip header row
@@ -142,7 +147,7 @@ function ExcelProcessor() {
         }
       }
   
-      return dataTypeMap
+      return dataTypeMap;
     }
   
     // Parse rules from the Rules sheet
@@ -171,102 +176,132 @@ function ExcelProcessor() {
   
     // Validate data types and conditions for all rows
     const validateRows = (inputData, dataTypeMap, conditions) => {
-      const headers = inputData[0]
       const dataTypeErrors = []
-      const conditionErrors = []
+      // const conditionErrors = []
       const errors = []
-      let validRows = 0
+      let validRows = 0;
   
       // Start from row 1 (skip header)
-      for (let i = 1; i < inputData.length; i++) {
-        const row = inputData[i]
+      for (let i = 0; i < inputData.length; i++) {
         let hasDataTypeError = false
-        let hasConditionError = false
+        // let hasConditionError = false
   
         // Check data types
-        for (let j = 0; j < headers.length; j++) {
-          const columnName = headers[j]
-          const cellValue = row[j]
-          const expectedType = dataTypeMap[columnName]
-  
-          if (expectedType && !validateDataType(cellValue, expectedType)) {
-            hasDataTypeError = true
-            errors.push({
-              row: i,
-              column: columnName,
-              value: cellValue,
-              error: `Expected ${expectedType}, got ${typeof cellValue}`,
-            })
-          }
+        for(const key in dataTypeMap){
+          const expectedType = dataTypeMap[key].toLowerCase();
+          const actualValue = inputData[i][key];
+          let actualType = typeof actualValue;
+
+          if (actualType === 'string') actualType = 'text';
+            else if (actualType === 'number') actualType = 'number';
+            else if (actualValue === null || actualValue === undefined) actualType = 'null';
+            else if (typeof actualValue === 'string' && /^[a-zA-Z0-9]*$/.test(actualValue)) actualType = 'general';
+            else if (expectedType === 'date' && typeof actualValue === 'number') actualType = 'date';
+            
+            if (expectedType !== actualType && actualValue !== null) {
+                errors.push({
+                    claimNumber: inputData[i]['Claim No'],
+                    column:key,
+                    value: actualValue,
+                    error: `Expected ${expectedType}, got ${actualType}`
+                });
+            }
+
+            console.log('ERrors',errors);
+          
+          // if (expectedType && !validateDataType(cellValue, expectedType)) {
+          //   hasDataTypeError = true
+          //   errors.push({
+          //     row: i,
+          //     column: columnName,
+          //     value: cellValue,
+          //     error: `Expected ${expectedType}, got ${typeof cellValue}`,
+          //   })
+          // }
         }
+        // for (let j = 0; j < headers.length; j++) {
+        //   const columnName = headers[j]
+        //   const cellValue = row[j]
+        //   const expectedType = dataTypeMap[columnName]
+  
+        //   if (expectedType && !validateDataType(cellValue, expectedType)) {
+        //     hasDataTypeError = true
+        //     errors.push({
+        //       row: i,
+        //       column: columnName,
+        //       value: cellValue,
+        //       error: `Expected ${expectedType}, got ${typeof cellValue}`,
+        //     })
+        //   }
+        // }
   
         // Check conditions
-        for (const { ruleNo, ruleDescription, conditions: ruleConditions } of conditions) {
-          let ruleFailed = false
+        // for (const { ruleNo, ruleDescription, conditions: ruleConditions } of conditions) {
+        //   let ruleFailed = false
   
-          for (const condition of ruleConditions) {
-            const expression = condition.replace(/\b\w+\b/g, (match) => {
-              const index = headers.indexOf(match)
-              return index !== -1 ? JSON.stringify(row[index]) : match
-            })
+        //   for (const condition of ruleConditions) {
+        //     const expression = condition.replace(/\b\w+\b/g, (match) => {
+        //       const index = headers.indexOf(match)
+        //       return index !== -1 ? JSON.stringify(row[index]) : match
+        //     })
   
-            if (!evaluateCondition(expression)) {
-              ruleFailed = true
-              errors.push({
-                row: i,
-                rule: ruleNo,
-                description: ruleDescription,
-                condition: condition,
-                error: `Condition failed: ${condition}`,
-              })
-              break
-            }
-          }
+        //     if (!evaluateCondition(expression)) {
+        //       ruleFailed = true
+        //       errors.push({
+        //         row: i,
+        //         rule: ruleNo,
+        //         description: ruleDescription,
+        //         condition: condition,
+        //         error: `Condition failed: ${condition}`,
+        //       })
+        //       break
+        //     }
+        //   }
   
-          if (ruleFailed) {
-            hasConditionError = true
-            break
-          }
-        }
+        //   if (ruleFailed) {
+        //     hasConditionError = true
+        //     break
+        //   }
+        // }
   
         // Add row to appropriate result set
-        if (hasDataTypeError) {
-          dataTypeErrors.push(row)
-        }
+        // if (hasDataTypeError) {
+        //   dataTypeErrors.push(row)
+        // }
   
-        if (hasConditionError) {
-          conditionErrors.push(row)
-        }
+        // if (hasConditionError) {
+        //   conditionErrors.push(row)
+        // }
   
-        if (!hasDataTypeError && !hasConditionError) {
-          validRows++
-        }
+        // if (!hasDataTypeError && !hasConditionError) {
+        //   validRows++
+        // }
       }
   
-      return {
-        validRows,
-        invalidRows: dataTypeErrors.length + conditionErrors.length,
-        dataTypeErrors,
-        conditionErrors,
-        errors,
-      }
+      // return {
+      //   validRows,
+      //   invalidRows: dataTypeErrors.length + conditionErrors.length,
+      //   dataTypeErrors,
+      //   conditionErrors,
+      //   errors,
+      // }
     }
   
     // Validate a cell value against an expected data type
     const validateDataType = (value, expectedType) => {
       switch (expectedType.toLowerCase()) {
-        case "string":
-          return typeof value === "string"
+        case "text":
+          return typeof value === "string";
         case "number":
-          return typeof value === "number" || !isNaN(Number(value))
-        case "boolean":
-          return typeof value === "boolean" || value === "true" || value === "false"
+          return typeof value === "number" || !isNaN(Number(value));
+        case "general":
+          return /^[a-zA-Z0-9]*$/.test(value);
         case "date":
-          return !isNaN(Date.parse(value))
+          return !isNaN(Date.parse(value));
         default:
-          return true // If type is unknown, consider it valid
+          return true; // If type is unknown, consider it valid
       }
-    }
+    };
   
     // Evaluate a condition expression
     const evaluateCondition = (expression) => {
