@@ -3,6 +3,7 @@ import * as XLSX from "xlsx"
 import FileUploader from "./FileUploader";
 import Progress from "./Progress";
 import Tabs from "./Tabs";
+import { dataTypeRegex, excelDateToDate } from "../lib/utils";
 // import ValidationEngine from "./ValidationEngine";
 
 function ExcelProcessor() {
@@ -15,8 +16,8 @@ function ExcelProcessor() {
     totalRows: 0,
     validRows: 0,
     invalidRows: 0,
-    subsheet1Count: 0,
-    subsheet2Count: 0,
+    subSheet1Count: 0,
+    subSheet2Count: 0,
   })
 
   //to handle input and rules file upload
@@ -70,7 +71,7 @@ function ExcelProcessor() {
           clearInterval(progressInterval)
         }
       }, 30)
-  
+
       // Process the files
       setTimeout(() => {
         try {
@@ -92,25 +93,32 @@ function ExcelProcessor() {
           const formattedInputData = inputData.slice(1).map(row => {
             let obj = {};
             headers.forEach((header, index) => {
+              if(header.includes('Date') && row[index] !== undefined){
+                const serialDate= row[index];
+                const convertedDate= excelDateToDate(serialDate);
+                obj[header] = convertedDate;
+              }else{
                 obj[header] = row[index] || null;
+              }
             });
             return obj;
         });
+          console.log("🚀 ~ formattedInputData ~ formattedInputData:", formattedInputData)
           // Parse data type map
           const dataTypeMap = parseDataTypeMap(mapData);
           // Parse rules
           const conditions = parseRules(rulesData)
   
           // Validate data types and rules
-          const validationResult = validateRows(formattedInputData, dataTypeMap, conditions)
+          const validationResult = validateRows(formattedInputData, dataTypeMap)
   
           // Update validation results
           setValidationResults({
             totalRows: inputData.length - 1, // Exclude header row
             validRows: validationResult.validRows,
             invalidRows: validationResult.invalidRows,
-            subsheet1Rows: validationResult.dataTypeErrors,
-            subsheet2Rows: validationResult.conditionErrors,
+            subSheet1Rows: validationResult.dataTypeErrors,
+            subSheet2Rows: validationResult.conditionErrors,
             errors: validationResult.errors,
           })
   
@@ -130,7 +138,7 @@ function ExcelProcessor() {
           setValidationStatus("error")
           setValidationProgress(100)
         }
-      }, 3000)
+      }, 1000)
     }
   
     // Parse the data type map from the Map sheet
@@ -175,14 +183,15 @@ function ExcelProcessor() {
     }
   
     // Validate data types and conditions for all rows
-    const validateRows = (inputData, dataTypeMap, conditions) => {
+    const validateRows = (inputData, dataTypeMap) => {
       const dataTypeErrors = []
       // const conditionErrors = []
       const errors = []
       let validRows = 0;
   
       // Start from row 1 (skip header)
-      for (let i = 0; i < inputData.length; i++) {
+      const inputLength = inputData.length;
+      for (let i = 0; i < inputLength; i++) {
         let hasDataTypeError = false
         // let hasConditionError = false
   
@@ -192,11 +201,12 @@ function ExcelProcessor() {
           const actualValue = inputData[i][key];
           let actualType = typeof actualValue;
 
-          if (actualType === 'string') actualType = 'text';
-            else if (actualType === 'number') actualType = 'number';
+          if (actualType === 'string' && expectedType === 'text') actualType = 'text';
+            else if (actualType === 'number' && expectedType === 'number') actualType = 'number';
             else if (actualValue === null || actualValue === undefined) actualType = 'null';
-            else if (typeof actualValue === 'string' && /^[a-zA-Z0-9]*$/.test(actualValue)) actualType = 'general';
-            else if (expectedType === 'date' && typeof actualValue === 'number') actualType = 'date';
+            else if ((actualType === 'string' || actualType === 'number') 
+              && dataTypeRegex.test(actualValue)) actualType = 'general';
+            else if (expectedType === 'date' && actualValue instanceof Date) actualType = 'date';
             
             if (expectedType !== actualType && actualValue !== null) {
                 errors.push({
@@ -207,67 +217,15 @@ function ExcelProcessor() {
                 });
             }
 
-            console.log('ERrors',errors);
-          
-          // if (expectedType && !validateDataType(cellValue, expectedType)) {
-          //   hasDataTypeError = true
-          //   errors.push({
-          //     row: i,
-          //     column: columnName,
-          //     value: cellValue,
-          //     error: `Expected ${expectedType}, got ${typeof cellValue}`,
-          //   })
-          // }
         }
-        // for (let j = 0; j < headers.length; j++) {
-        //   const columnName = headers[j]
-        //   const cellValue = row[j]
-        //   const expectedType = dataTypeMap[columnName]
-  
-        //   if (expectedType && !validateDataType(cellValue, expectedType)) {
-        //     hasDataTypeError = true
-        //     errors.push({
-        //       row: i,
-        //       column: columnName,
-        //       value: cellValue,
-        //       error: `Expected ${expectedType}, got ${typeof cellValue}`,
-        //     })
-        //   }
-        // }
-  
+        console.log('Er',errors);
+
         // Check conditions
-        // for (const { ruleNo, ruleDescription, conditions: ruleConditions } of conditions) {
-        //   let ruleFailed = false
-  
-        //   for (const condition of ruleConditions) {
-        //     const expression = condition.replace(/\b\w+\b/g, (match) => {
-        //       const index = headers.indexOf(match)
-        //       return index !== -1 ? JSON.stringify(row[index]) : match
-        //     })
-  
-        //     if (!evaluateCondition(expression)) {
-        //       ruleFailed = true
-        //       errors.push({
-        //         row: i,
-        //         rule: ruleNo,
-        //         description: ruleDescription,
-        //         condition: condition,
-        //         error: `Condition failed: ${condition}`,
-        //       })
-        //       break
-        //     }
-        //   }
-  
-        //   if (ruleFailed) {
-        //     hasConditionError = true
-        //     break
-        //   }
-        // }
   
         // Add row to appropriate result set
-        // if (hasDataTypeError) {
-        //   dataTypeErrors.push(row)
-        // }
+        if (hasDataTypeError) {
+          dataTypeErrors.push(errors)
+        }
   
         // if (hasConditionError) {
         //   conditionErrors.push(row)
@@ -278,31 +236,15 @@ function ExcelProcessor() {
         // }
       }
   
-      // return {
-      //   validRows,
-      //   invalidRows: dataTypeErrors.length + conditionErrors.length,
-      //   dataTypeErrors,
-      //   conditionErrors,
-      //   errors,
-      // }
-    }
-  
-    // Validate a cell value against an expected data type
-    const validateDataType = (value, expectedType) => {
-      switch (expectedType.toLowerCase()) {
-        case "text":
-          return typeof value === "string";
-        case "number":
-          return typeof value === "number" || !isNaN(Number(value));
-        case "general":
-          return /^[a-zA-Z0-9]*$/.test(value);
-        case "date":
-          return !isNaN(Date.parse(value));
-        default:
-          return true; // If type is unknown, consider it valid
+      return {
+        validRows,
+        invalidRows: dataTypeErrors.length,
+        dataTypeErrors,
+        // conditionErrors,
+        errors,
       }
-    };
-  
+    }
+    
     // Evaluate a condition expression
     const evaluateCondition = (expression) => {
       try {
@@ -460,28 +402,28 @@ function ExcelProcessor() {
 
             <Tabs
               tabs={[
-                { id: "subsheet1", label: `Subsheet 1 (${validationResults.subsheet1Count} rows)` },
-                { id: "subsheet2", label: `Subsheet 2 (${validationResults.subsheet2Count} rows)` },
+                { id: "subSheet1", label: `SubSheet 1 (${validationResults.subSheet1Count} rows)` },
+                { id: "subSheet2", label: `SubSheet 2 (${validationResults.subSheet2Count} rows)` },
               ]}
-              defaultTab="subsheet1"
+              defaultTab="subSheet1"
               content={{
-                subsheet1: (
+                subSheet1: (
                   <div className="tab-content">
                     <p style={{ fontSize: "0.875rem", color: "#666" }}>
-                      This subsheet contains rows where the condition is not true.
+                      This subSheet contains rows where the condition is not true.
                     </p>
                     <p style={{ fontSize: "0.875rem", marginTop: "8px" }}>
-                      {validationResults.subsheet1Count} rows have been added to Subsheet 1.
+                      {validationResults.subSheet1Count} rows have been added to SubSheet 1.
                     </p>
                   </div>
                 ),
-                subsheet2: (
+                subSheet2: (
                   <div className="tab-content">
                     <p style={{ fontSize: "0.875rem", color: "#666" }}>
-                      This subsheet contains rows where the condition is not true.
+                      This subSheet contains rows where the condition is not true.
                     </p>
                     <p style={{ fontSize: "0.875rem", marginTop: "8px" }}>
-                      {validationResults.subsheet2Count} rows have been added to Subsheet 2.
+                      {validationResults.subSheet2Count} rows have been added to SubSheet 2.
                     </p>
                   </div>
                 ),
