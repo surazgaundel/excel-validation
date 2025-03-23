@@ -3,7 +3,7 @@ import * as XLSX from "xlsx"
 import FileUploader from "./FileUploader";
 import Progress from "./Progress";
 import Tabs from "./Tabs";
-import { dataTypeRegex, excelDateToDate } from "../lib/utils";
+import { excelDateToDate, validateRowsWithDataType,validateRowsWithConditionMapping } from "../lib/utils";
 // import ValidationEngine from "./ValidationEngine";
 
 function ExcelProcessor() {
@@ -44,17 +44,6 @@ function ExcelProcessor() {
     reader.readAsArrayBuffer(file);
   };
 
-  // const validateData = ValidationEngine({
-  //   inputFile,
-  //   rulesFile,
-  //   setValidationStatus,
-  //   setValidationProgress,
-  //   setValidationResults,
-  //   setProcessedFile,
-  // });
-
-
-
     const validateAndProcess = () => {
       setValidationStatus("validating")
       setValidationProgress(0)
@@ -88,7 +77,7 @@ function ExcelProcessor() {
           const rulesData = XLSX.utils.sheet_to_json(rulesSheet, { header: 1 })
           
           // Extract headers
-          const headers = inputData[0].map(header => header?.toString().trim());
+          const headers = inputData[0].map(header => header?.toString().trim().split(' ').join(''));
 
           const formattedInputData = inputData.slice(1).map(row => {
             let obj = {};
@@ -103,30 +92,33 @@ function ExcelProcessor() {
             });
             return obj;
         });
-          console.log("🚀 ~ formattedInputData ~ formattedInputData:", formattedInputData)
           // Parse data type map
           const dataTypeMap = parseDataTypeMap(mapData);
           // Parse rules
           const conditions = parseRules(rulesData)
   
-          // Validate data types and rules
-          const validationResult = validateRows(formattedInputData, dataTypeMap)
-  
+          // Validate row with data type
+          const validationRowResultWithDataType = validateRowsWithDataType(formattedInputData, dataTypeMap)
+        
+          // validate row with condition mapping
+          const validationResultWithConditionMapping = validateRowsWithConditionMapping(formattedInputData, conditions, headers);
           // Update validation results
-          setValidationResults({
+          const combinedResults = {
             totalRows: inputData.length - 1, // Exclude header row
-            validRows: validationResult.validRows,
-            invalidRows: validationResult.invalidRows,
-            subSheet1Rows: validationResult.dataTypeErrors,
-            subSheet2Rows: validationResult.conditionErrors,
-            errors: validationResult.errors,
-          })
+            validRows: validationRowResultWithDataType.validRows,
+            invalidRows: validationRowResultWithDataType.invalidRows + validationResultWithConditionMapping.invalidRows,
+            subSheet1Count: validationRowResultWithDataType.typeErrors.length,
+            subSheet2Count: validationResultWithConditionMapping.conditionErrors.length,
+            errors: [...validationRowResultWithDataType.typeErrors, ...validationResultWithConditionMapping.conditionErrors],
+          };
+
+          setValidationResults(combinedResults);
   
           // Create processed workbook
           const processedWorkbook = createProcessedWorkbook(
             inputData,
-            validationResult.dataTypeErrors,
-            validationResult.conditionErrors,
+            validationRowResultWithDataType.typeErrors,
+            validationResultWithConditionMapping.conditionErrors,
             headers,
           )
           setProcessedFile(processedWorkbook);
@@ -138,7 +130,7 @@ function ExcelProcessor() {
           setValidationStatus("error")
           setValidationProgress(100)
         }
-      }, 1000)
+      }, 3000)
     }
   
     // Parse the data type map from the Map sheet
@@ -182,81 +174,8 @@ function ExcelProcessor() {
       return conditions
     }
   
-    // Validate data types and conditions for all rows
-    const validateRows = (inputData, dataTypeMap) => {
-      const dataTypeErrors = []
-      // const conditionErrors = []
-      const errors = []
-      let validRows = 0;
-  
-      // Start from row 1 (skip header)
-      const inputLength = inputData.length;
-      for (let i = 0; i < inputLength; i++) {
-        let hasDataTypeError = false
-        // let hasConditionError = false
-  
-        // Check data types
-        for(const key in dataTypeMap){
-          const expectedType = dataTypeMap[key].toLowerCase();
-          const actualValue = inputData[i][key];
-          let actualType = typeof actualValue;
-
-          if (actualType === 'string' && expectedType === 'text') actualType = 'text';
-            else if (actualType === 'number' && expectedType === 'number') actualType = 'number';
-            else if (actualValue === null || actualValue === undefined) actualType = 'null';
-            else if ((actualType === 'string' || actualType === 'number') 
-              && dataTypeRegex.test(actualValue)) actualType = 'general';
-            else if (expectedType === 'date' && actualValue instanceof Date) actualType = 'date';
-            
-            if (expectedType !== actualType && actualValue !== null) {
-                errors.push({
-                    claimNumber: inputData[i]['Claim No'],
-                    column:key,
-                    value: actualValue,
-                    error: `Expected ${expectedType}, got ${actualType}`
-                });
-            }
-
-        }
-        console.log('Er',errors);
-
-        // Check conditions
-  
-        // Add row to appropriate result set
-        if (hasDataTypeError) {
-          dataTypeErrors.push(errors)
-        }
-  
-        // if (hasConditionError) {
-        //   conditionErrors.push(row)
-        // }
-  
-        // if (!hasDataTypeError && !hasConditionError) {
-        //   validRows++
-        // }
-      }
-  
-      return {
-        validRows,
-        invalidRows: dataTypeErrors.length,
-        dataTypeErrors,
-        // conditionErrors,
-        errors,
-      }
-    }
-    
-    // Evaluate a condition expression
-    const evaluateCondition = (expression) => {
-      try {
-        return Function('"use strict"; return (' + expression + ")")()
-      } catch (e) {
-        console.error("Error evaluating condition:", expression, e)
-        return false // Return false if condition fails to evaluate
-      }
-    }
-  
     // Create the processed workbook with original data and error sheets
-    const createProcessedWorkbook = (inputData, dataTypeErrors, conditionErrors, headers) => {
+    const createProcessedWorkbook = (inputData, typeErrors, conditionErrors, headers) => {
       const workbook = XLSX.utils.book_new()
   
       // Add original data
@@ -264,16 +183,14 @@ function ExcelProcessor() {
       XLSX.utils.book_append_sheet(workbook, originalSheet, "Original")
   
       // Add data type errors sheet
-      if (dataTypeErrors.length > 0) {
-        const dataTypeErrorsWithHeader = [headers, ...dataTypeErrors]
-        const dataTypeErrorsSheet = XLSX.utils.aoa_to_sheet(dataTypeErrorsWithHeader)
+      if (typeErrors.length > 0) {
+        const dataTypeErrorsSheet = XLSX.utils.json_to_sheet(typeErrors)
         XLSX.utils.book_append_sheet(workbook, dataTypeErrorsSheet, "DataTypeErrors")
       }
   
       // Add condition errors sheet
       if (conditionErrors.length > 0) {
-        const conditionErrorsWithHeader = [headers, ...conditionErrors]
-        const conditionErrorsSheet = XLSX.utils.aoa_to_sheet(conditionErrorsWithHeader)
+        const conditionErrorsSheet = XLSX.utils.json_to_sheet(conditionErrors)
         XLSX.utils.book_append_sheet(workbook, conditionErrorsSheet, "ConditionErrors")
       }
   
