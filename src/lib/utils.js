@@ -163,7 +163,7 @@ export const validateRowsWithConditionMapping = (inputData, conditionMap, header
               if(!result) {
                 hasConditionMapError = true;
                 const errorObj = {
-                  claimNumber: inputData[i]['ClaimNo'],
+                  claimNumber: inputData[i]['claimno'],
                   Value: inputData[i][header],
                   Rule: `Rule: ${ruleNo}, ${ruleDescription}`,
                   Error: `Error evaluating condition: ${condition}`
@@ -174,7 +174,7 @@ export const validateRowsWithConditionMapping = (inputData, conditionMap, header
               console.error(`Error evaluating condition: ${condition}`, error);
               hasConditionMapError = true;
               const errorObj = {
-                claimNumber: inputData[i]['ClaimNo'],
+                claimNumber: inputData[i]['claimno'],
                 Value: inputData[i][header],
                 Rule: `Rule: ${ruleNo}, ${ruleDescription}`,
                 Error: `Error evaluating condition: ${condition}`
