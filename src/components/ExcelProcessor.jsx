@@ -4,6 +4,7 @@ import FileUploader from "./FileUploader";
 import Progress from "./Progress";
 import Tabs from "./Tabs";
 import { excelDateToDate, validateRowsWithDataType,validateRowsWithConditionMapping } from "../lib/utils";
+import ResetButton from "./ResetButton";
 // import ValidationEngine from "./ValidationEngine";
 
 function ExcelProcessor() {
@@ -19,6 +20,7 @@ function ExcelProcessor() {
     subSheet1Count: 0,
     subSheet2Count: 0,
   })
+  const [errorMessage, setErrorMessage] = useState('');
 
   //to handle input and rules file upload
   const handleFileUpload = (file, type) => {
@@ -30,7 +32,17 @@ function ExcelProcessor() {
         if(type === 'input'){
         setInputFile({ name: file.name, data: workbook })
         } else{
-          setRulesFile({ name: file.name, data: workbook })
+          const sheetNames = workbook.SheetNames;
+          if ((sheetNames.length === 2 && (sheetNames.includes('DataMap') && sheetNames.includes('ConditionRule'))) ||
+          (sheetNames.length === 1 && (sheetNames.includes('DataMap') || sheetNames.includes('ConditionRule')))) {
+            setRulesFile({ name: file.name, data: workbook });
+            setErrorMessage('');
+          }else{
+            setValidationStatus('error');
+            const error="Required sheet names 'DataMap' for datatype and 'ConditionRule' for condition are missing in rules file"
+            setErrorMessage(error);
+            throw new Error(error);
+          }
         }
       } catch (error) {
         console.error(`Error reading ${type} file:`, error);
@@ -68,16 +80,15 @@ function ExcelProcessor() {
           const inputSheet = inputFile.data.Sheets[inputFile.data.SheetNames[0]]
   
           // Get the map and rules sheets from rules file
-          const mapSheet = rulesFile.data.Sheets[rulesFile.data.SheetNames[0]];
-          const rulesSheet = rulesFile.data.Sheets[rulesFile.data.SheetNames[1]];
-  
+          const mapSheet = rulesFile.data.Sheets['DataMap'];
+          const rulesSheet = rulesFile.data.Sheets['ConditionRule'];
           // Convert sheets to JSON
           const inputData = XLSX.utils.sheet_to_json(inputSheet, { header: 1 })
           const mapData = XLSX.utils.sheet_to_json(mapSheet, { header: 1 })
           const rulesData = XLSX.utils.sheet_to_json(rulesSheet, { header: 1 })
           
           // Extract headers
-          const headers = inputData[0].map(header => header?.toString().trim().split(' ').join(''));
+          const headers = inputData[0].map(header => header?.toString().trim().toLowerCase().split(' ').join(''));
 
           const formattedInputData = inputData.slice(1).map(row => {
             let obj = {};
@@ -118,8 +129,7 @@ function ExcelProcessor() {
           const processedWorkbook = createProcessedWorkbook(
             inputData,
             validationRowResultWithDataType.typeErrors,
-            validationResultWithConditionMapping.conditionErrors,
-            headers,
+            validationResultWithConditionMapping.conditionErrors
           )
           setProcessedFile(processedWorkbook);
           setValidationStatus("success")
@@ -158,8 +168,8 @@ function ExcelProcessor() {
       for (let i = 1; i < rulesData.length; i++) {
         const row = rulesData[i]
         if (row.length >= 3) {
-          const ruleNo = row[0]
-          const ruleDescription = row[1]
+          const ruleNo = row['Rule No'] || row[0]
+          const ruleDescription = row['Rule Description'] || row[1]
           // Get all conditions (may be in columns 2, 3, 4, etc.)
           const ruleConditions = row.slice(2).filter(Boolean) // Only add non-empty conditions
   
@@ -175,7 +185,7 @@ function ExcelProcessor() {
     }
   
     // Create the processed workbook with original data and error sheets
-    const createProcessedWorkbook = (inputData, typeErrors, conditionErrors, headers) => {
+    const createProcessedWorkbook = (inputData, typeErrors, conditionErrors) => {
       const workbook = XLSX.utils.book_new()
   
       // Add original data
@@ -209,6 +219,14 @@ function ExcelProcessor() {
     setProcessedFile(null)
     setValidationStatus("idle")
     setValidationProgress(0)
+    setValidationResults({
+      totalRows: 0,
+      validRows: 0,
+      invalidRows: 0,
+      subSheet1Count: 0,
+      subSheet2Count: 0,
+    });
+    setErrorMessage('');
   }
 
   const canValidate = inputFile.data && rulesFile.data && validationStatus !== "validating"
@@ -236,10 +254,11 @@ function ExcelProcessor() {
           />
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 flex-col">
           <button className="button w-full" onClick={validateAndProcess} disabled={!canValidate}>
             {isProcessing ? "Processing..." : "Validate and Process"}
           </button>
+          <ResetButton resetProcess={resetProcess} disabled={isProcessing}/>
         </div>
 
         {isProcessing && (
@@ -267,7 +286,7 @@ function ExcelProcessor() {
             </svg>
             <div>
               <div className="alert-title">Error</div>
-              <p>There was an error processing your files. Please check the file formats and try again.</p>
+              {errorMessage ? errorMessage : <p>There was an error processing your files. Please check the file formats and try again.</p>}
             </div>
           </div>
         )}
@@ -348,59 +367,31 @@ function ExcelProcessor() {
             />
 
             <div className="flex justify-between mt-4">
-              <button className="button button-outline" onClick={resetProcess}>
-                <svg
-                  style={{ marginRight: "8px", width: "16px", height: "16px" }}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  />
-                  <path
-                    d="M16 12L8 12"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M13 9L16 12L13 15"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                Start Over
-              </button>
+              <ResetButton resetProcess={resetProcess}/>
               <button className="button" onClick={downloadProcessedFile}>
-                <svg
-                  style={{ marginRight: "8px", width: "16px", height: "16px" }}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15"
-                    stroke="white"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M7 10L12 15L17 10"
-                    stroke="white"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path d="M12 15V3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Download Processed File
+                  <svg
+                    style={{ marginRight: "8px", width: "16px", height: "16px" }}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15"
+                      stroke="white"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M7 10L12 15L17 10"
+                      stroke="white"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path d="M12 15V3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Download Processed File
               </button>
             </div>
           </div>

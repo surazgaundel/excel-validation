@@ -135,7 +135,7 @@ const evaluateBinaryExpression = (expression, rowData) => {
   }
 };
 
-const removeWhiteSpace=(string)=> string.replace(/\s+/g, '');
+const removeWhiteSpace=(string)=> string.toLowerCase().replace(/\s+/g, '');
 export const validateRowsWithConditionMapping = (inputData, conditionMap, headers) =>{
 
   const conditionMapErrors = []
