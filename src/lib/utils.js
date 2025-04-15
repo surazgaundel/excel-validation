@@ -35,7 +35,6 @@ export  const validateRowsWithDataType = (inputData, dataTypeMap) => {
       const expectedType = formattedDataTypeMap[key].toLowerCase();
       const actualValue = inputData[i][key];
       let actualType = typeof actualValue;
-
       if (actualType === 'string' && expectedType === 'text') {
         actualType = 'text';
       } else if (actualType === 'number' && expectedType === 'number') {
@@ -46,11 +45,12 @@ export  const validateRowsWithDataType = (inputData, dataTypeMap) => {
           actualType = 'general';
       } else if (expectedType === 'date' && actualValue instanceof Date) {
         actualType = 'date';
-      } 
-        if (expectedType !== actualType && actualValue !== null) {
+      }  else if (actualType === 'number' && expectedType === 'amount') {
+        actualType = 'amount';
+      } else if (expectedType !== actualType && actualValue !== null) {
           hasDataTypeError=true;
           const errorObj={
-            claimNumber: inputData[i]['ClaimNo'],
+            claimNumber: inputData[i]['claimno'],
             Header:key,
             Value: actualValue,
             Error: `Expected ${expectedType}, got ${actualType}`
@@ -136,50 +136,59 @@ const evaluateBinaryExpression = (expression, rowData) => {
 };
 
 const removeWhiteSpace=(string)=> string.toLowerCase().replace(/\s+/g, '');
-export const validateRowsWithConditionMapping = (inputData, conditionMap, headers) =>{
 
-  const conditionMapErrors = []
+function getErrorObj(input,header,ruleNo,ruleDescription,condition){
+  const errorObj = {
+    claimNumber: input['claimno'],
+    Value: input[header],
+    Rule: `Rule: ${ruleNo}, ${ruleDescription}`,
+    Error: `Error evaluating condition: ${condition}`
+  };
+
+  return errorObj;
+}
+
+export const validateRowsWithConditionMapping = (inputData, conditionMap, headers) => {
+  const conditionMapErrors = [];
   let validRows = 0;
-  
+
   const inputLength = inputData.length;
+
   for (let i = 0; i < inputLength; i++) {
-    let hasConditionMapError = false
-    const errors = []
+    let hasConditionMapError = false;
+    const errors = [];
 
-    // Check data types
-    for(const key in conditionMap){
-      const {ruleNo, ruleDescription, conditions} = conditionMap[key];
-      for (const condition of conditions){
+    const row = inputData[i];
 
-        for (const header of headers){
+    for (const conditionObj of conditionMap) {
+      const { ruleNo, ruleDescription, conditions } = conditionObj;
+      for (const condition of conditions) {
+        const formattedCondition = removeWhiteSpace(condition);
+        for (const header of headers) {
           const formattedHeader = removeWhiteSpace(header);
-          const formattedCondition = removeWhiteSpace(condition);
-          const regex = new RegExp(`\\b${formattedHeader}\\b`,'g');          
-          const containHeader = regex.test(formattedCondition);
-          if(containHeader){
+          const regex = new RegExp(`\\b${formattedHeader}\\b`, 'g');
+
+          const containsHeader = regex.test(formattedCondition);
+
+          if (containsHeader) {
             try {
               const parsedCondition = jsep(formattedCondition);
-              const result = evaluateCondition(parsedCondition, inputData[i]);
-              if(!result) {
+              const result = evaluateCondition(parsedCondition, row);
+
+              if (!result) {
                 hasConditionMapError = true;
-                const errorObj = {
-                  claimNumber: inputData[i]['claimno'],
-                  Value: inputData[i][header],
-                  Rule: `Rule: ${ruleNo}, ${ruleDescription}`,
-                  Error: `Error evaluating condition: ${condition}`
-                };
+                const errorObj= getErrorObj(row,header,ruleNo,ruleDescription,condition);
                 errors.push(errorObj);
+                continue; // stop checking more conditions, go to next row
               }
+
+              break; // Condition passed, move to next condition
             } catch (error) {
               console.error(`Error evaluating condition: ${condition}`, error);
               hasConditionMapError = true;
-              const errorObj = {
-                claimNumber: inputData[i]['claimno'],
-                Value: inputData[i][header],
-                Rule: `Rule: ${ruleNo}, ${ruleDescription}`,
-                Error: `Error evaluating condition: ${condition}`
-              };
+              const errorObj= getErrorObj(row,header,ruleNo,ruleDescription,condition);
               errors.push(errorObj);
+              continue; // stop checking more conditions, go to next row
             }
           }
         }
@@ -187,7 +196,7 @@ export const validateRowsWithConditionMapping = (inputData, conditionMap, header
     }
 
     if (hasConditionMapError) {
-      conditionMapErrors.push(errors)
+      conditionMapErrors.push(errors);
     } else {
       validRows++;
     }
@@ -198,5 +207,5 @@ export const validateRowsWithConditionMapping = (inputData, conditionMap, header
     validRows,
     invalidRows: conditionErrors.length,
     conditionErrors
-  }
-}
+  };
+};
