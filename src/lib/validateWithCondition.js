@@ -77,7 +77,10 @@ export const validateRowsWithConditionMapping = (inputData, conditionMap, header
 
     conditionMapLoop:for (const conditionObj of conditionMap) {
       const { ruleNo, ruleDescription, conditions } = conditionObj;
-      for (const condition of conditions) {
+      for (let i=0;i<conditions.length;i++) {
+        const condition = conditions[i];
+        const isFirstCondition = i=== 0;
+        
         const formattedCondition = removeWhiteSpace(condition);
         for (const header of headers) {
           const formattedHeader = removeWhiteSpace(header);
@@ -90,19 +93,27 @@ export const validateRowsWithConditionMapping = (inputData, conditionMap, header
               const parsedCondition = jsep(formattedCondition);
               const result = evaluateCondition(parsedCondition, row);
               if (!result) {
-                hasConditionMapError = true;
-                const errorObj= getErrorObj(row,header,ruleNo,ruleDescription,condition);
-                errors.push(errorObj);
-                break conditionMapLoop; // stop checking more conditions, go to next row
+                if(isFirstCondition){
+                  continue conditionMapLoop;
+                }else{
+                  hasConditionMapError = true;
+                  const errorObj= getErrorObj(row,header,ruleNo,ruleDescription,condition);
+                  errors.push(errorObj);
+                  break conditionMapLoop; // stop checking more conditions, go to next row
+                }
               }else{
                 break; // Condition passed, move to next condition
               }
             } catch (error) {
-              console.error(`Error evaluating condition: ${condition}`, error);
-              hasConditionMapError = true;
-              const errorObj= getErrorObj(row,header,ruleNo,ruleDescription,condition);
-              errors.push(errorObj);
-              break conditionMapLoop; // stop checking more conditions, go to next row
+              if(isFirstCondition){
+                continue conditionMapLoop;
+              }else{
+                console.error(`Error evaluating condition: ${condition}`, error);
+                hasConditionMapError = true;
+                const errorObj= getErrorObj(row,header,ruleNo,ruleDescription,condition);
+                errors.push(errorObj);
+                break conditionMapLoop; // stop checking more conditions, go to next row
+              }
             }
           }
         }
