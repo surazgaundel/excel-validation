@@ -278,7 +278,7 @@ function ExcelProcessor() {
       <div className="card">
         <div className="grid grid-cols-2">
           <FileUploader
-            label="Upload Input Excel File"
+            label="Upload Billing - Charges Report"
             accept=".xlsx,.xls"
             onFileUpload={(file) => handleFileUpload(file, "input")}
             fileName={inputFile.name}
